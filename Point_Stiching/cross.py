@@ -11,6 +11,7 @@ import cv2, os, sys
 import matplotlib.pyplot as plt
 from skimage.measure import label, regionprops
 #from skimage import morphology
+from utils import *
 
 
 def draw_boxes(img, boxes, color=255, thickness=2):
@@ -19,7 +20,7 @@ def draw_boxes(img, boxes, color=255, thickness=2):
     return img
 
 
-def get_cross(img_file="sample1.png", thresh=235):
+def write_cross(img_file="sample1.png", thresh=235):
     """Filter out the cross and save into file
     
     Args:
@@ -94,7 +95,7 @@ def get_intersection(pt1, pt2, pt3, pt4):
     return (x0, y0)
     
     
-def get_center(cross_img_file, hsize=0, vsize=0, hstep=30, vstep=20):
+def get_cross(cross_img_file, hsize=0, vsize=0, hstep=30, vstep=20):
     """Get the center of the cross
     
     Args:
@@ -103,6 +104,9 @@ def get_center(cross_img_file, hsize=0, vsize=0, hstep=30, vstep=20):
         vsize: vertical kernel size to find the area contains the cross center
         hstep: moving step in the horizontal region
         vstep: moving step in the verical region
+        
+    Returns:
+        center: center point of the cross
     
     """
     img = cv2.imread(cross_img_file, cv2.IMREAD_GRAYSCALE)
@@ -149,20 +153,33 @@ def get_center(cross_img_file, hsize=0, vsize=0, hstep=30, vstep=20):
     center1 = get_intersection(left_up, right_dn, left_dn, right_up)
     center2 = get_intersection(top_left, bottom_right, top_right, bottom_left)
     center = (int((center1[0]+center2[0])/2), int((center1[1]+center2[1])/2))
-    """
-    print(center)
+    
+    # Get the horizontal and vertical slope 
+    hor_angle1 = get_angle(left_up, right_up)
+    hor_angle2 = get_angle(left_dn, right_dn)
+    ver_angle1 = get_angle(top_left, bottom_left)
+    ver_angle2 = get_angle(top_right, bottom_right)
+    
+    print(left_up, left_dn)
+    print(right_up, right_dn)
+    
+    hor_angle = (hor_angle1+hor_angle2)/2
+    ver_angle = (ver_angle1+ver_angle2)/2
+    
+    
+    print(center, hor_angle, ver_angle)
     if window is not None:     
         img_box = img.copy()
         img_box = draw_boxes(img_box, [window])
         plt.subplot(1,2,1), plt.imshow(img, cmap="gray"), plt.title("Original Cross")
         plt.subplot(1,2,2), plt.imshow(img_box, cmap="gray"), plt.title("Selected Window")
         plt.show()
-    """   
-    return center
+    
+    return center, hor_angle, ver_angle
     
     
 if __name__ == "__main__":
-    center = get_center("sample1_cr.png")
+    center, hor_angle, ver_angle = get_cross("sample2_cr.png")
     
 
 
