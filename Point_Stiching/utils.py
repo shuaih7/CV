@@ -23,6 +23,9 @@ def sort_points(center, points):
     
     
 def get_angle(center, point) -> float:
+    """
+    0 -> 360
+    """
     x0, y0 = center[0], center[1]
     x1, y1 = point[0], point[1]
     if y0 == y1 and x1 >= x0: return 0.0
@@ -36,7 +39,25 @@ def get_angle(center, point) -> float:
     else: return 360.0 - value
     
     
-def dye_image(img_cross_origin):
+def get_image_angle(center, point) -> float:
+    """
+    -180 -> 0 -> 180
+    """
+    x0, y0 = center[0], center[1]
+    x1, y1 = point[0], point[1]
+    if y0 == y1 and x1 >= x0: return 0.0
+    
+    y0, y1 = -y0, -y1
+    length = math.sqrt((x1-x0)**2+(y1-y0)**2)
+    
+    cos_value = (x1-x0) / length
+    value = math.acos(cos_value)/math.pi * 180
+    
+    if y1 > y0: return value
+    else: return -1 * value
+    
+    
+def dye_cross_image(img_cross_origin):
     img_cross = img_cross_origin.copy()
     img_h, img_w = img_cross.shape[:2]
     hor_array = img_cross.sum(axis=0)
@@ -85,8 +106,8 @@ def dye_image(img_cross_origin):
     
     
 if __name__ == "__main__":
-    img_cross = cv2.imread("sample2_cr.png", cv2.IMREAD_GRAYSCALE)
-    img_cross[img_cross>200] = 255
-    img_cross[img_cross<=200] = 0
-    img_cross_mask = dye_image(img_cross)
+    center = (400,200)
+    point = (350,250)
+    angle = get_image_angle(center, point)
+    print(angle)
     

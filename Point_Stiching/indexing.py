@@ -153,7 +153,6 @@ class ImageIndex(object):
         self.extract_coord(img)
         #self._test()
         
-        
     def extract_coord(self, img):
         self._extract_features(img)
         self._parse_cross(img)

@@ -95,11 +95,11 @@ def get_intersection(pt1, pt2, pt3, pt4):
     return (x0, y0)
     
     
-def get_cross(cross_img_file, hsize=0, vsize=0, hstep=30, vstep=20):
+def get_cross(img, hsize=0, vsize=0, hstep=30, vstep=20):
     """Get the center of the cross
     
     Args:
-        cross_img_file: Binary image with the cross
+        img:   Binary image with the cross
         hsize: horizontal kernel size to find the area contains the cross center
         vsize: vertical kernel size to find the area contains the cross center
         hstep: moving step in the horizontal region
@@ -109,7 +109,6 @@ def get_cross(cross_img_file, hsize=0, vsize=0, hstep=30, vstep=20):
         center: center point of the cross
     
     """
-    img = cv2.imread(cross_img_file, cv2.IMREAD_GRAYSCALE)
     img_h, img_w = img.shape[:2]
     if hsize == 0: hsize = img_w // 4
     if vsize == 0: vsize = img_h // 4
@@ -155,17 +154,13 @@ def get_cross(cross_img_file, hsize=0, vsize=0, hstep=30, vstep=20):
     center = (int((center1[0]+center2[0])/2), int((center1[1]+center2[1])/2))
     
     # Get the horizontal and vertical slope 
-    hor_angle1 = get_angle(left_up, right_up)
-    hor_angle2 = get_angle(left_dn, right_dn)
-    ver_angle1 = get_angle(top_left, bottom_left)
-    ver_angle2 = get_angle(top_right, bottom_right)
-    
-    print(left_up, left_dn)
-    print(right_up, right_dn)
+    hor_angle1 = get_image_angle(left_up, right_up)
+    hor_angle2 = get_image_angle(left_dn, right_dn)
+    ver_angle1 = get_image_angle(bottom_left, top_left)
+    ver_angle2 = get_image_angle(bottom_right, top_right)
     
     hor_angle = (hor_angle1+hor_angle2)/2
     ver_angle = (ver_angle1+ver_angle2)/2
-    
     
     print(center, hor_angle, ver_angle)
     if window is not None:     
@@ -179,7 +174,9 @@ def get_cross(cross_img_file, hsize=0, vsize=0, hstep=30, vstep=20):
     
     
 if __name__ == "__main__":
-    center, hor_angle, ver_angle = get_cross("sample2_cr.png")
+    img = cv2.imread("sample2_cr.png", cv2.IMREAD_GRAYSCALE)
+    center, hor_angle, ver_angle = get_cross(img)
+
     
 
 
