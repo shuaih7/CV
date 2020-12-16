@@ -95,18 +95,67 @@ def get_intersection(pt1, pt2, pt3, pt4):
     return (x0, y0)
     
     
+def dye_cross_image(img_cross_origin, coord_pts):
+    img_cross = img_cross_origin.copy()
+    img_h, img_w = img_cross.shape[:2]
+    hor_array = img_cross.sum(axis=0)
+    ver_array = img_cross.sum(axis=1)
+
+    h_start, v_start = False, False
+    for i in range(hor_array.shape[0]):
+        if hor_array[i] > 0 and not h_start:
+            h_start = True # Start the horizontal line tracking 
+            for j in range(img_h): 
+                if img_cross[j,i] > 0:
+                    for k in range(i,-1,-1): img_cross[j,k] = 255
+                    break
+        elif hor_array[i] == 0 and h_start:
+            for j in range(img_h): 
+                if img_cross[j,i-1] > 0:
+                    for k in range(i,img_w,1): img_cross[j,k] = 255
+                    break
+            
+    for j in range(ver_array.shape[0]):
+        if ver_array[j] > 0 and not v_start:
+            v_start = True
+            for i in range(img_w):
+                if img_cross[j,i] > 0:
+                    for k in range(j,-1,-1): img_cross[k,i] = 255
+                    break
+        elif ver_array[j] == 0 and v_start: 
+            for i in range(img_w): 
+                if img_cross[j-1,i] > 0:
+                    for k in range(j,img_h,1): img_cross[k,i] = 255
+                    break
+    
+    inv_img_cross = 255 - img_cross
+    img_cross_mask = label(inv_img_cross, connectivity = 2)
+    img_cross_mask[img_cross_mask>4] = 0
+    
+    
+    img_cross_mask += 255 # Mask sure that the indices are not overlap
+    for coord_id, coord_pt in enumerate(coord_pts):
+        cur_id = img_cross_mask[coord_pt[1], coord_pt[0]]
+        img_cross_mask[img_cross_mask==cur_id] = coord_id
+    
+    return img_cross_mask
+    
+    
 def get_cross(img, hsize=0, vsize=0, hstep=30, vstep=20):
     """Get the center of the cross
     
     Args:
-        img:   Binary image with the cross
-        hsize: horizontal kernel size to find the area contains the cross center
-        vsize: vertical kernel size to find the area contains the cross center
+        img: Binary image with the cross
+        hsize: horizontal kernel size to find the area contains the cross center, 0 is to set automatically
+        vsize: vertical kernel size to find the area contains the cross center, 0 is to set automatically
         hstep: moving step in the horizontal region
         vstep: moving step in the verical region
         
     Returns:
         center: center point of the cross
+        hor_angle:
+        ver_angle:
+        img_cross_mask:
     
     """
     img_h, img_w = img.shape[:2]
@@ -128,6 +177,7 @@ def get_cross(img, hsize=0, vsize=0, hstep=30, vstep=20):
             v_pos += vstep # Add a vertical step
         v_pos = 0
         h_pos += hstep # Add a horizontal step
+    if window is None: return None, None, None, None # There is no window for the cross center
     
     for i in range(window[0]+1, window[2], 1):
         if img[window[1],i-1] == 0 and img[window[1],i] > 0: 
@@ -162,6 +212,10 @@ def get_cross(img, hsize=0, vsize=0, hstep=30, vstep=20):
     hor_angle = (hor_angle1+hor_angle2)/2
     ver_angle = (ver_angle1+ver_angle2)/2
     
+    coord_pts = [center, (window[2],window[1]), (window[0],window[1]), 
+                 (window[0],window[3]), (window[2],window[3])] # Corner points, as the indices for the 4 different coordinates
+    img_cross_mask = dye_cross_image(img, coord_pts) # Get the cross image mask
+    
     # print(center, hor_angle, ver_angle)
     # if window is not None:     
         # img_box = img.copy()
@@ -170,12 +224,15 @@ def get_cross(img, hsize=0, vsize=0, hstep=30, vstep=20):
         # plt.subplot(1,2,2), plt.imshow(img_box, cmap="gray"), plt.title("Selected Window")
         # plt.show()
     
-    return center, hor_angle, ver_angle
+    return center, hor_angle, ver_angle, img_cross_mask
     
     
 if __name__ == "__main__":
-    img = cv2.imread("sample2_cr.png", cv2.IMREAD_GRAYSCALE)
-    center, hor_angle, ver_angle = get_cross(img)
+    img = cv2.imread("sample1_cr.png", cv2.IMREAD_GRAYSCALE)
+    center, hor_angle, ver_angle, img_cross_mask = get_cross(img)
+    
+    print(img_cross_mask[center[1], center[0]], img_cross_mask[0,-1], img_cross_mask[0,0], img_cross_mask[-1,0], img_cross_mask[-1,-1])
+    plt.imshow(img_cross_mask, cmap="gray"), plt.show()
 
     
 

@@ -56,7 +56,7 @@ def extract_image(img, thresh=220, min_rad=20, max_rad=80):
     plt.show()
     '''
     return img_points, img_cross
-    
+
 
 def get_hor_len(point1, point2):
     # x1, y1 = point1
@@ -86,7 +86,7 @@ def register(point,
         "hor_angle": hor_angle,
         "ver_angle": ver_angle,
         "hor_len": hor_len,
-        "ver_len":ver_len,
+        "ver_len":ver_len
     }
     
     index = (point[0], point[1])
