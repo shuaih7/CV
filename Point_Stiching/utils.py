@@ -9,7 +9,7 @@ from matplotlib import pyplot as plt
 from skimage.measure import label, regionprops
 
 
-def sort_points(center, points):
+def sort_points(center, points) -> list:
     if len(points) == 0: return points
     sorted_points, dists = [], []
     
@@ -106,8 +106,9 @@ def dye_cross_image(img_cross_origin):
     
     
 if __name__ == "__main__":
-    center = (400,200)
-    point = (350,250)
-    angle = get_image_angle(center, point)
-    print(angle)
+    a = [1,2,3,4,5]
+    b = a.copy()
+    del b[-2]
+    print(a)
+    print(b)
     

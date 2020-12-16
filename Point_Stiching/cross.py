@@ -162,13 +162,13 @@ def get_cross(img, hsize=0, vsize=0, hstep=30, vstep=20):
     hor_angle = (hor_angle1+hor_angle2)/2
     ver_angle = (ver_angle1+ver_angle2)/2
     
-    print(center, hor_angle, ver_angle)
-    if window is not None:     
-        img_box = img.copy()
-        img_box = draw_boxes(img_box, [window])
-        plt.subplot(1,2,1), plt.imshow(img, cmap="gray"), plt.title("Original Cross")
-        plt.subplot(1,2,2), plt.imshow(img_box, cmap="gray"), plt.title("Selected Window")
-        plt.show()
+    # print(center, hor_angle, ver_angle)
+    # if window is not None:     
+        # img_box = img.copy()
+        # img_box = draw_boxes(img_box, [window])
+        # plt.subplot(1,2,1), plt.imshow(img, cmap="gray"), plt.title("Original Cross")
+        # plt.subplot(1,2,2), plt.imshow(img_box, cmap="gray"), plt.title("Selected Window")
+        # plt.show()
     
     return center, hor_angle, ver_angle
     
