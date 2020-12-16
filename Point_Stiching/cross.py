@@ -142,7 +142,7 @@ def dye_cross_image(img_cross_origin, coord_pts):
     
     
 def get_cross(img, hsize=0, vsize=0, hstep=30, vstep=20):
-    """Get the center of the cross
+    """Get the crucial information of the cross
     
     Args:
         img: Binary image with the cross
@@ -153,9 +153,9 @@ def get_cross(img, hsize=0, vsize=0, hstep=30, vstep=20):
         
     Returns:
         center: center point of the cross
-        hor_angle:
-        ver_angle:
-        img_cross_mask:
+        hor_angle: horizontal angle at the center of the cross
+        ver_angle: vertical angle at the center of the cross
+        img_cross_mask: index matrix of the dyed cross image
     
     """
     img_h, img_w = img.shape[:2]

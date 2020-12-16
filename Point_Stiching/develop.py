@@ -15,7 +15,7 @@ from cross import get_cross
 POINTS = {}
 
 
-def extract_image(img, thresh=220, min_rad=20, max_rad=80):
+def extract_image(img, thresh=220, min_rad=15, max_rad=80):
     """Binarize the input image and extract multiple info
     
     Args:
@@ -75,6 +75,7 @@ def get_ver_len(point1, point2):
 def register(point, 
              row, 
              col, 
+             coordinate,
              hor_angle=0,
              ver_angle=0, 
              hor_len=0, 
@@ -83,6 +84,7 @@ def register(point,
     point_elem = {
         "row": row,
         "col": col,
+        "coordinate": coordinate,
         "hor_angle": hor_angle,
         "ver_angle": ver_angle,
         "hor_len": hor_len,
@@ -169,6 +171,8 @@ def search_surround(input_points,
                     max_angle_shift=10,
                     max_hor_ratio=1.5,
                     max_ver_ratio=1.5):
+                    
+    if len(input_points) == 0 or center is None: return
     points = input_points.copy()
     points = sort_points(center, points)
     
@@ -184,25 +188,31 @@ def search_surround(input_points,
             if (pt[0], pt[1]) not in POINTS:
                 nrow, ncol, nhor_angle, nver_angle, nhor_len, nver_len = update_information(center, pt, row, col, 
                                         hor_angle, ver_angle, hor_len, ver_len, coordinate, dir="horizontal")
-                register(pt, nrow, ncol)
+                register(pt, nrow, ncol, coordinate)
                 search_surround(points, pt, nrow, ncol, nhor_angle, nver_angle, nhor_len, nver_len, coordinate)
         elif abs(get_angle(center, pt)-ver_angle)<max_angle_shift \
                 and max(get_ver_len(center,pt),ver_len)/min(get_ver_len(center,pt),ver_len)<max_ver_ratio:
             if (pt[0], pt[1]) not in POINTS:
                 nrow, ncol, nhor_angle, nver_angle, nhor_len, nver_len = update_information(center, pt, row, col, 
                                         hor_angle, ver_angle, hor_len, ver_len, coordinate, dir="vertical")
-                register(pt, nrow, ncol)
+                register(pt, nrow, ncol, coordinate)
                 search_surround(points, pt, nrow, ncol, nhor_angle, nver_angle, nhor_len, nver_len, coordinate) 
     return             
             
 
-def index_single(img, coordinate=4, max_angle_shift=10, max_hor_ratio=1.5, max_ver_ratio=1.5):
-    img_points, img_cross = extract_image(img)
-    center, hor_angle, ver_angle = get_cross(img_cross)
+def index_coordinate(img_points, 
+                 center, 
+                 hor_angle,
+                 ver_angle,
+                 img_cross_mask, 
+                 coordinate, 
+                 max_angle_shift=10, 
+                 max_hor_ratio=1.5, 
+                 max_ver_ratio=1.5,
+                 start_factor=1.5):
     
-    img_cross_mask = dye_cross_image(img_cross)
     cur_points = img_points.copy()
-    cur_points[img_cross_mask!=3] = 0
+    cur_points[img_cross_mask!=coordinate] = 0
     
     points = []
     label_mask = label(cur_points, connectivity = 2)
@@ -212,56 +222,94 @@ def index_single(img, coordinate=4, max_angle_shift=10, max_hor_ratio=1.5, max_v
     
     # 1. Get the closest point as the anchor
     points = sort_points(center, points)
+    if len(points) == 0: return # Case when there is no point inside this coordinate
+    
     anchor = points[0]
+    register(anchor, row=0, col=0, coordinate=coordinate)
     
     # 2. Initialize the point grid size
-    hor_index, ver_index, hor_anchor, ver_anchor = 0, 0, None, None
+    hor_index, ver_index = 0, 0
+    hor_anchor, ver_anchor = None, None
+    
+    if len(points) == 1: return # Case when there is only one point inside this coordinate
     points = sort_points(anchor, points[1:])
+    
     for i, pt in enumerate(points):
-        pt_hor_angle = get_image_angle(anchor, pt)  
-        pt_ver_angle = 180 + pt_hor_angle # get_image_angle(anchor, pt) 
-        if abs(pt_hor_angle-hor_angle) < max_angle_shift and hor_anchor is None:
+        if coordinate in [1, 4]: 
+            pt_hor_angle = get_image_angle(anchor, pt)
+            if coordinate==1: pt_ver_angle = get_image_angle(anchor, pt)
+            elif coordinate==4: pt_ver_angle = get_image_angle(pt, anchor)
+        else: 
+            pt_hor_angle = get_image_angle(pt, anchor)
+            if coordinate==2: pt_ver_angle = get_image_angle(anchor, pt)
+            elif coordinate==3: pt_ver_angle = get_image_angle(pt, anchor)
+         
+        if abs(pt_hor_angle-hor_angle) < max_angle_shift*start_factor and hor_anchor is None:
             hor_anchor = pt
             hor_index = i
-        elif abs(pt_ver_angle-ver_angle) < max_angle_shift and ver_anchor is None:
+        elif abs(pt_ver_angle-ver_angle) < max_angle_shift*start_factor and ver_anchor is None:
             ver_anchor = pt
             ver_index = i
         if hor_anchor is not None and ver_anchor is not None: break
+        
+    if hor_anchor is None and ver_anchor is None: return # Case when the horizontal and vertical anchors cannot be found
     
-    hor_len = get_hor_len(hor_anchor, anchor)
-    ver_len = get_ver_len(ver_anchor, anchor)
-    hor_angle = get_image_angle(anchor, hor_anchor) # Update the horizontal angle
-    ver_angle = get_image_angle(ver_anchor, anchor) # Update the vertical angle
-    
-    # 3. Register the anchor points
-    register(anchor, row=0, col=0)
-    register(hor_anchor, row=0, col=1)
-    register(ver_anchor, row=1, col=0)
-    print(hor_angle, ver_angle)
-    
-    # 4. Seaching for the surroundings
+    if hor_anchor is not None:
+        hor_len = get_hor_len(hor_anchor, anchor)
+        hor_angle = get_image_angle(anchor, hor_anchor) # Update the horizontal angle
+        register(hor_anchor, row=0, col=1, coordinate=coordinate)
+     
+    if ver_anchor is not None:
+        ver_len = get_ver_len(ver_anchor, anchor)
+        ver_angle = get_image_angle(ver_anchor, anchor) # Update the vertical angle
+        register(ver_anchor, row=1, col=0, coordinate=coordinate)
+
+    # Case when there only exits one anchor point
+    if hor_anchor is None: hor_len = ver_len
+    if ver_anchor is None: ver_len = hor_len
+        
     pts_for_hor = points
-    del pts_for_hor[hor_index]
+    # del pts_for_hor[hor_index]
     pts_for_ver = points.copy()
-    del pts_for_ver[ver_index]
+    # del pts_for_ver[ver_index]
+    
     search_surround(points, hor_anchor, 0, 1, hor_angle, ver_angle, hor_len, ver_len, 
-                    coordinate, max_angle_shift, max_hor_ratio, max_ver_ratio)
+                coordinate, max_angle_shift, max_hor_ratio, max_ver_ratio)
     search_surround(points, ver_anchor, 1, 0, hor_angle, ver_angle, hor_len, ver_len, 
                     coordinate, max_angle_shift, max_hor_ratio, max_ver_ratio)
         
-    # TODO: Determine the case when there is no hor-anchor or ver_anchor ...
     # print(anchor, hor_anchor, ver_anchor)
     # plt.imshow(cur_points, cmap="gray"), plt.show()
     
-   
-if __name__ == "__main__":
-    img_file = "sample1.png"
-    img = cv2.imread(img_file, cv2.IMREAD_GRAYSCALE)
-    index_single(img)
+
+def index_image(img, 
+                max_angle_shift=10, 
+                max_hor_ratio=1.5, 
+                max_ver_ratio=1.5):
+                
+    img_points, img_cross = extract_image(img)
+    center, hor_angle, ver_angle, img_cross_mask = get_cross(img_cross)
+    if center is None: 
+        raise Exception("Could not find the cross inside the input image.")
+        
+    for coordinate in range(1,5):
+        index_coordinate(img_points, center, hor_angle, ver_angle, img_cross_mask, 
+                         coordinate, max_angle_shift, max_hor_ratio, max_ver_ratio)
+    
+    # plt.subplot(1,2,1), plt.imshow(img_points, cmap="gray"), plt.title("Point Image")
+    # plt.subplot(1,2,2), plt.imshow(img_cross, cmap="gray"), plt.title("Cross Image")
     for elem in POINTS:
         print(elem)
         print(POINTS[elem])
         print()
+    plt.imshow(img_points, cmap="gray"), plt.title("Point Image"), plt.show()
+
+
+if __name__ == "__main__":
+    img_file = "./test/test.png"
+    img = cv2.imread(img_file, cv2.IMREAD_GRAYSCALE)
+    index_image(img)
+    
     
     
 

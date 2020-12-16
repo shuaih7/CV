@@ -56,11 +56,13 @@ def get_image_angle(center, point) -> float:
     if y1 > y0: return value
     else: return -1 * value
     
+
+def create_background(shape, save_name="background.png"):
+    img = np.zeros(shape, dtype=np.uint8)
+    cv2.imwrite(save_name, img)
+    
     
 if __name__ == "__main__":
-    a = [1,2,3,4,5]
-    b = a.copy()
-    del b[-2]
-    print(a)
-    print(b)
+    shape = (480,640)
+    create_background(shape)
     
