@@ -41,20 +41,19 @@ def get_angle(center, point) -> float:
     
 def get_image_angle(center, point) -> float:
     """
-    -180 -> 0 -> 180
+    0 -> 90
     """
     x0, y0 = center[0], center[1]
     x1, y1 = point[0], point[1]
-    if y0 == y1 and x1 >= x0: return 0.0
+    if y0 == y1: return 0.0
     
     y0, y1 = -y0, -y1
     length = math.sqrt((x1-x0)**2+(y1-y0)**2)
     
-    cos_value = (x1-x0) / length
+    cos_value = abs(x1-x0) / length
     value = math.acos(cos_value)/math.pi * 180
     
-    if y1 > y0: return value
-    else: return -1 * value
+    return value
     
 
 def create_background(shape, save_name="background.png"):

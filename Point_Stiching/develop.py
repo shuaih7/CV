@@ -76,6 +76,7 @@ def register(point,
              row, 
              col, 
              coordinate,
+             previous=None,
              hor_angle=0,
              ver_angle=0, 
              hor_len=0, 
@@ -85,11 +86,13 @@ def register(point,
         "row": row,
         "col": col,
         "coordinate": coordinate,
-        "hor_angle": hor_angle,
-        "ver_angle": ver_angle,
-        "hor_len": hor_len,
-        "ver_len":ver_len
+        "from": previous
     }
+        # "hor_angle": hor_angle,
+        # "ver_angle": ver_angle,
+        # "hor_len": hor_len,
+        # "ver_len":ver_len
+    # }
     
     index = (point[0], point[1])
     POINTS[index] = point_elem
@@ -132,25 +135,23 @@ def update_information(center,
     
     if dir == "horizontal":
         hor_len = get_hor_len(center, point)
+        hor_angle = get_image_angle(center, point)
         
         if x1 > x0: 
-            hor_angle = get_image_angle(center, point)
             if coordinate==1 or coordinate==4: col += 1
             else: col -= 1
         elif x1 < x0:
-            hor_angle = get_image_angle(point, center)
             if coordinate==1 or coordinate==4: col -= 1
             else: col += 1
             
     elif dir == "vertical":
         ver_len = get_ver_len(center, point)
+        ver_angle = get_image_angle(center, point)
         
         if y1 > y0:
-            ver_angle = get_image_angle(point, center)
             if coordinate==3 or coordinate==4: row += 1
             else: row -= 1
         elif y1 < y0:
-            ver_angle = get_image_angle(center, point)
             if coordinate==3 or coordinate==4: row -= 1
             else: row += 1
     else:
@@ -179,23 +180,30 @@ def search_surround(input_points,
     x0, y0 = center
     for i, pt in enumerate(points[:8]):
         x1, y1 = pt
-        # Two points are identical
+        
+        # Filter out the identical points
         if abs(x1-x0)<0.0001 and abs(y1-y0)<0.0001:
             continue
-        # Check the horizontal right
-        if abs(get_angle(center, pt)-hor_angle)<max_angle_shift \
+            
+        # Calculate the angle shift
+        cur_angle = get_image_angle(center, pt)
+        hor_angle_shift = abs(cur_angle - hor_angle)
+        ver_angle_shift = abs(cur_angle - ver_angle)
+            
+        if hor_angle_shift < max_angle_shift \
                 and max(get_hor_len(center,pt),hor_len)/min(get_hor_len(center,pt),hor_len)<max_hor_ratio:
             if (pt[0], pt[1]) not in POINTS:
                 nrow, ncol, nhor_angle, nver_angle, nhor_len, nver_len = update_information(center, pt, row, col, 
                                         hor_angle, ver_angle, hor_len, ver_len, coordinate, dir="horizontal")
-                register(pt, nrow, ncol, coordinate)
+                register(pt, nrow, ncol, coordinate, (row, col))
                 search_surround(points, pt, nrow, ncol, nhor_angle, nver_angle, nhor_len, nver_len, coordinate)
-        elif abs(get_angle(center, pt)-ver_angle)<max_angle_shift \
+                
+        elif ver_angle_shift < max_angle_shift \
                 and max(get_ver_len(center,pt),ver_len)/min(get_ver_len(center,pt),ver_len)<max_ver_ratio:
             if (pt[0], pt[1]) not in POINTS:
                 nrow, ncol, nhor_angle, nver_angle, nhor_len, nver_len = update_information(center, pt, row, col, 
                                         hor_angle, ver_angle, hor_len, ver_len, coordinate, dir="vertical")
-                register(pt, nrow, ncol, coordinate)
+                register(pt, nrow, ncol, coordinate, (row, col))
                 search_surround(points, pt, nrow, ncol, nhor_angle, nver_angle, nhor_len, nver_len, coordinate) 
     return             
             
@@ -209,7 +217,7 @@ def index_coordinate(img_points,
                  max_angle_shift=10, 
                  max_hor_ratio=1.5, 
                  max_ver_ratio=1.5,
-                 start_factor=1.5):
+                 start_factor=1.2):
     
     cur_points = img_points.copy()
     cur_points[img_cross_mask!=coordinate] = 0
@@ -228,50 +236,36 @@ def index_coordinate(img_points,
     register(anchor, row=0, col=0, coordinate=coordinate)
     
     # 2. Initialize the point grid size
-    hor_index, ver_index = 0, 0
     hor_anchor, ver_anchor = None, None
     
     if len(points) == 1: return # Case when there is only one point inside this coordinate
     points = sort_points(anchor, points[1:])
     
     for i, pt in enumerate(points):
-        if coordinate in [1, 4]: 
-            pt_hor_angle = get_image_angle(anchor, pt)
-            if coordinate==1: pt_ver_angle = get_image_angle(anchor, pt)
-            elif coordinate==4: pt_ver_angle = get_image_angle(pt, anchor)
-        else: 
-            pt_hor_angle = get_image_angle(pt, anchor)
-            if coordinate==2: pt_ver_angle = get_image_angle(anchor, pt)
-            elif coordinate==3: pt_ver_angle = get_image_angle(pt, anchor)
+        pt_angle = get_image_angle(anchor, pt)
          
-        if abs(pt_hor_angle-hor_angle) < max_angle_shift*start_factor and hor_anchor is None:
+        if abs(pt_angle-hor_angle) < max_angle_shift*start_factor and hor_anchor is None:
             hor_anchor = pt
-            hor_index = i
-        elif abs(pt_ver_angle-ver_angle) < max_angle_shift*start_factor and ver_anchor is None:
+            hor_angle = pt_angle # Update the horizontal angle
+            hor_len = get_hor_len(hor_anchor, anchor)
+            register(hor_anchor, row=0, col=1, coordinate=coordinate, previous=(0,0))
+            
+        elif abs(pt_angle-ver_angle) < max_angle_shift*start_factor and ver_anchor is None:
             ver_anchor = pt
-            ver_index = i
+            ver_angle = pt_angle # Update the vertical angle
+            ver_len = get_ver_len(ver_anchor, anchor)
+            register(ver_anchor, row=1, col=0, coordinate=coordinate, previous=(0,0))
+            
         if hor_anchor is not None and ver_anchor is not None: break
-        
-    if hor_anchor is None and ver_anchor is None: return # Case when the horizontal and vertical anchors cannot be found
     
-    if hor_anchor is not None:
-        hor_len = get_hor_len(hor_anchor, anchor)
-        hor_angle = get_image_angle(anchor, hor_anchor) # Update the horizontal angle
-        register(hor_anchor, row=0, col=1, coordinate=coordinate)
-     
-    if ver_anchor is not None:
-        ver_len = get_ver_len(ver_anchor, anchor)
-        ver_angle = get_image_angle(ver_anchor, anchor) # Update the vertical angle
-        register(ver_anchor, row=1, col=0, coordinate=coordinate)
+    if hor_anchor is None and ver_anchor is None: return # Case when the horizontal and vertical anchors cannot be found
 
     # Case when there only exits one anchor point
     if hor_anchor is None: hor_len = ver_len
     if ver_anchor is None: ver_len = hor_len
         
     pts_for_hor = points
-    # del pts_for_hor[hor_index]
     pts_for_ver = points.copy()
-    # del pts_for_ver[ver_index]
     
     search_surround(points, hor_anchor, 0, 1, hor_angle, ver_angle, hor_len, ver_len, 
                 coordinate, max_angle_shift, max_hor_ratio, max_ver_ratio)
@@ -283,18 +277,22 @@ def index_coordinate(img_points,
     
 
 def index_image(img, 
-                max_angle_shift=10, 
+                max_angle_shift=20, 
                 max_hor_ratio=1.5, 
-                max_ver_ratio=1.5):
+                max_ver_ratio=1.5,
+                start_factor=1.2):
                 
     img_points, img_cross = extract_image(img)
     center, hor_angle, ver_angle, img_cross_mask = get_cross(img_cross)
+    
     if center is None: 
         raise Exception("Could not find the cross inside the input image.")
+    elif abs(ver_angle-hor_angle) < max_angle_shift*start_factor:
+        raise Exception("The horizontal and vertical angles are too close")
         
     for coordinate in range(1,5):
         index_coordinate(img_points, center, hor_angle, ver_angle, img_cross_mask, 
-                         coordinate, max_angle_shift, max_hor_ratio, max_ver_ratio)
+                coordinate, max_angle_shift, max_hor_ratio, max_ver_ratio, start_factor)
     
     # plt.subplot(1,2,1), plt.imshow(img_points, cmap="gray"), plt.title("Point Image")
     # plt.subplot(1,2,2), plt.imshow(img_cross, cmap="gray"), plt.title("Cross Image")
@@ -302,7 +300,7 @@ def index_image(img,
         print(elem)
         print(POINTS[elem])
         print()
-    plt.imshow(img_points, cmap="gray"), plt.title("Point Image"), plt.show()
+    plt.imshow(img_points, cmap="gray"), plt.title("Points Image"), plt.show()
 
 
 if __name__ == "__main__":
