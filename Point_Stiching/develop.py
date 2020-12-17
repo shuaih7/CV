@@ -4,6 +4,7 @@ import os
 import sys
 import cv2
 import math
+import time
 import numpy as np
 from matplotlib import pyplot as plt
 from skimage.measure import label, regionprops
@@ -13,6 +14,22 @@ from cross import get_cross
 
 
 POINTS = {}
+
+
+def display_index(img, color=(0,0,255), size=0.6, thickness=2):
+    if img.shape[-1] > 4: img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+    
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    for pos in POINTS:
+        elem = POINTS[pos]
+        point = (int(pos[0]), int(pos[1]))
+        index = elem["index"]
+        # img = cv2.circle(img, point, radius, color, thickness)
+        img = cv2.putText(img, str(index), point, font, size, color, thickness)
+    plt.imshow(img), plt.title("Image Indexing Result")
+    plt.show()
+    
+    return img
 
 
 def extract_image(img, thresh=220, min_rad=15, max_rad=80):
@@ -72,6 +89,21 @@ def get_ver_len(point1, point2):
     return abs(point2[1]-point1[1])
     
     
+def map_index(row, col, coordinate):
+    if coordinate == 1:
+        position = (row, col)
+    elif coordinate == 2:
+        position = (row, -col)
+    elif coordinate == 3:
+        position = (-row, -col)
+    elif coordinate == 4:
+        position = (-row, col)
+    else:
+        raise ValueError("Invalid coordinate index")
+    
+    return position
+    
+    
 def register(point, 
              row, 
              col, 
@@ -86,7 +118,8 @@ def register(point,
         "row": row,
         "col": col,
         "coordinate": coordinate,
-        "from": previous
+        "from": previous,
+        "index": map_index(row, col, coordinate)
     }
         # "hor_angle": hor_angle,
         # "ver_angle": ver_angle,
@@ -233,7 +266,7 @@ def index_coordinate(img_points,
     if len(points) == 0: return # Case when there is no point inside this coordinate
     
     anchor = points[0]
-    register(anchor, row=0, col=0, coordinate=coordinate)
+    register(anchor, row=1, col=1, coordinate=coordinate)
     
     # 2. Initialize the point grid size
     hor_anchor, ver_anchor = None, None
@@ -248,13 +281,13 @@ def index_coordinate(img_points,
             hor_anchor = pt
             hor_angle = pt_angle # Update the horizontal angle
             hor_len = get_hor_len(hor_anchor, anchor)
-            register(hor_anchor, row=0, col=1, coordinate=coordinate, previous=(0,0))
+            register(hor_anchor, row=1, col=2, coordinate=coordinate, previous=(0,0))
             
         elif abs(pt_angle-ver_angle) < max_angle_shift*start_factor and ver_anchor is None:
             ver_anchor = pt
             ver_angle = pt_angle # Update the vertical angle
             ver_len = get_ver_len(ver_anchor, anchor)
-            register(ver_anchor, row=1, col=0, coordinate=coordinate, previous=(0,0))
+            register(ver_anchor, row=2, col=1, coordinate=coordinate, previous=(0,0))
             
         if hor_anchor is not None and ver_anchor is not None: break
     
@@ -267,9 +300,9 @@ def index_coordinate(img_points,
     pts_for_hor = points
     pts_for_ver = points.copy()
     
-    search_surround(points, hor_anchor, 0, 1, hor_angle, ver_angle, hor_len, ver_len, 
+    search_surround(points, hor_anchor, 1, 2, hor_angle, ver_angle, hor_len, ver_len, 
                 coordinate, max_angle_shift, max_hor_ratio, max_ver_ratio)
-    search_surround(points, ver_anchor, 1, 0, hor_angle, ver_angle, hor_len, ver_len, 
+    search_surround(points, ver_anchor, 2, 1, hor_angle, ver_angle, hor_len, ver_len, 
                     coordinate, max_angle_shift, max_hor_ratio, max_ver_ratio)
         
     # print(anchor, hor_anchor, ver_anchor)
@@ -296,17 +329,23 @@ def index_image(img,
     
     # plt.subplot(1,2,1), plt.imshow(img_points, cmap="gray"), plt.title("Point Image")
     # plt.subplot(1,2,2), plt.imshow(img_cross, cmap="gray"), plt.title("Cross Image")
-    for elem in POINTS:
-        print(elem)
-        print(POINTS[elem])
-        print()
-    plt.imshow(img_points, cmap="gray"), plt.title("Points Image"), plt.show()
+    # for elem in POINTS:
+        # print(elem)
+        # print(POINTS[elem])
+        # print()
+    # plt.imshow(img_points, cmap="gray"), plt.title("Points Image"), plt.show()
 
 
 if __name__ == "__main__":
-    img_file = "./test/test.png"
+    img_file = "sample1.png"
     img = cv2.imread(img_file, cv2.IMREAD_GRAYSCALE)
+    
+    start = time.time()
     index_image(img)
+    period = time.time() - start
+    print("The running time is %s.", period)
+    
+    display_index(img)
     
     
     
