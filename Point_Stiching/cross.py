@@ -141,7 +141,7 @@ def dye_cross_image(img_cross_origin, coord_pts):
     return img_cross_mask
     
     
-def get_cross(img, hsize=0, vsize=0, hstep=30, vstep=20):
+def get_cross(img, hsize=0, vsize=0, hstep=50, vstep=50):
     """Get the crucial information of the cross
     
     Args:
@@ -159,8 +159,8 @@ def get_cross(img, hsize=0, vsize=0, hstep=30, vstep=20):
     
     """
     img_h, img_w = img.shape[:2]
-    if hsize == 0: hsize = img_w // 4
-    if vsize == 0: vsize = img_h // 4
+    if hsize == 0: hsize = max(img_w//4, img_h//4)
+    if vsize == 0: vsize = max(img_w//4, img_h//4)
     
     h_pos, v_pos, max_num, window = 0, 0, 0, None
     
@@ -168,12 +168,11 @@ def get_cross(img, hsize=0, vsize=0, hstep=30, vstep=20):
         while v_pos+vsize < img_h:
             cur_win = img[v_pos:v_pos+vsize, h_pos:h_pos+hsize]
             cur_num = cur_win.sum()//255
-            if cur_num > max_num: 
-                #label_mask = label(255-cur_win, connectivity = 2)
-                #if label_mask.max() == 4:
-                if is_valid_window(cur_win):
-                    window = [h_pos, v_pos, h_pos+hsize, v_pos+vsize]
-                    max_num = cur_num
+            
+            if is_valid_window(cur_win):
+                window = [h_pos, v_pos, h_pos+hsize, v_pos+vsize]
+                max_num = cur_num
+                
             v_pos += vstep # Add a vertical step
         v_pos = 0
         h_pos += hstep # Add a horizontal step
@@ -228,11 +227,18 @@ def get_cross(img, hsize=0, vsize=0, hstep=30, vstep=20):
     
     
 if __name__ == "__main__":
-    img = cv2.imread("sample1_cr.png", cv2.IMREAD_GRAYSCALE)
-    center, hor_angle, ver_angle, img_cross_mask = get_cross(img)
+    img = cv2.imread("cross.png", cv2.IMREAD_GRAYSCALE)
+    #crop_img = img[150:400,200:400]
+    #if is_valid_window(crop_img): print("Yes")
+    #img = draw_boxes(img, [[220,120,420,320]])
+    #plt.imshow(img, cmap="gray"), plt.show()
     
-    print(img_cross_mask[center[1], center[0]], img_cross_mask[0,-1], img_cross_mask[0,0], img_cross_mask[-1,0], img_cross_mask[-1,-1])
-    plt.imshow(img_cross_mask, cmap="gray"), plt.show()
+    center, hor_angle, ver_angle, img_cross_mask = get_cross(img)#, hsize=200, vsize=200)
+    if center is not None: print("Yes")
+        
+    
+    #print(img_cross_mask[center[1], center[0]], img_cross_mask[0,-1], img_cross_mask[0,0], img_cross_mask[-1,0], img_cross_mask[-1,-1])
+    #plt.imshow(img_cross_mask, cmap="gray"), plt.show()
 
     
 

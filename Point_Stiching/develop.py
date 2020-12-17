@@ -54,8 +54,6 @@ def extract_image(img, thresh=220, min_rad=15, max_rad=80):
     label_mask = label(img_points, connectivity = 2)
     properties = regionprops(label_mask)
 
-    max_rad = 80
-    #points = []
     for prop in properties:
         diameter = prop.equivalent_diameter
         if diameter < min_rad:
@@ -242,15 +240,15 @@ def search_surround(input_points,
             
 
 def index_coordinate(img_points, 
-                 center, 
-                 hor_angle,
-                 ver_angle,
-                 img_cross_mask, 
-                 coordinate, 
-                 max_angle_shift=10, 
-                 max_hor_ratio=1.5, 
-                 max_ver_ratio=1.5,
-                 start_factor=1.2):
+                     center, 
+                     hor_angle,
+                     ver_angle,
+                     img_cross_mask, 
+                     coordinate, 
+                     max_angle_shift=10, 
+                     max_hor_ratio=1.5, 
+                     max_ver_ratio=1.5,
+                     start_factor=1.2):
     
     cur_points = img_points.copy()
     cur_points[img_cross_mask!=coordinate] = 0
@@ -310,12 +308,15 @@ def index_coordinate(img_points,
     
 
 def index_image(img, 
+                thresh=210,
+                min_rad=15,
+                max_rad=60,
                 max_angle_shift=20, 
                 max_hor_ratio=1.5, 
                 max_ver_ratio=1.5,
                 start_factor=1.2):
                 
-    img_points, img_cross = extract_image(img)
+    img_points, img_cross = extract_image(img, thresh, min_rad, max_rad)
     center, hor_angle, ver_angle, img_cross_mask = get_cross(img_cross)
     
     if center is None: 
@@ -337,15 +338,14 @@ def index_image(img,
 
 
 if __name__ == "__main__":
-    img_file = "sample1.png"
+    img_file = "./test/sample_cross.png"
     img = cv2.imread(img_file, cv2.IMREAD_GRAYSCALE)
-    
     start = time.time()
-    index_image(img)
+    index_image(img, thresh=210, min_rad=15, max_rad=60,)
     period = time.time() - start
     print("The running time is %s.", period)
     
-    display_index(img)
+    display_index(img,size=0.3, thickness=1)
     
     
     
