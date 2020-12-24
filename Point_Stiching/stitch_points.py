@@ -346,7 +346,7 @@ def index_image(img,
 
 
 if __name__ == "__main__":
-    img_file = "./test/points.png"
+    img_file = "./test/points2.png"
     center = (337,180)
     hor_anchor = None#(375,175)
     ver_anchor = None#(335,215)
