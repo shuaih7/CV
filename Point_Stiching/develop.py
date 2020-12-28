@@ -93,13 +93,12 @@ def register(point,
              
     point_elem = {
         "from": previous,
-        "index": (row, col)
+        "index": (row, col),
+        "hor_angle": hor_angle,
+        "ver_angle": ver_angle,
+        "hor_len": hor_len,
+        "ver_len":ver_len
     }
-        # "hor_angle": hor_angle,
-        # "ver_angle": ver_angle,
-        # "hor_len": hor_len,
-        # "ver_len":ver_len
-    # }
     
     index = (point[0], point[1])
     POINTS[index] = point_elem
@@ -184,23 +183,29 @@ def search_surround(input_points,
             
         # Calculate the angle shift
         cur_angle = get_image_angle(center, pt)
-        hor_angle_shift = abs(cur_angle - hor_angle)
-        ver_angle_shift = abs(cur_angle - ver_angle)
-            
-        if hor_angle_shift < max_angle_shift \
+        
+        if is_same_dir(hor_angle, cur_angle, max_angle_shift) \
                 and max(get_hor_len(center,pt),hor_len)/min(get_hor_len(center,pt),hor_len)<max_hor_ratio:
+            
+            ## Checking box
+            # if int(x1) == 328 and int(y1) == 268: 
+                # print("from:", POINTS[(center[0],center[1])]["index"])
+                # print("angle =", cur_angle, "hor_angle =", hor_angle, "ver_angle =", ver_angle)
+                # print()
+                
             if (pt[0], pt[1]) not in POINTS:
                 nrow, ncol, nhor_angle, nver_angle, nhor_len, nver_len = update_information(center, pt, row, col, 
                                         hor_angle, ver_angle, hor_len, ver_len, dir="horizontal")
-                register(pt, nrow, ncol, (row, col))
+                register(pt, nrow, ncol, (row, col), hor_angle, ver_angle)
                 search_surround(points, pt, nrow, ncol, nhor_angle, nver_angle, nhor_len, nver_len)
                 
-        elif ver_angle_shift < max_angle_shift \
+        elif is_same_dir(ver_angle, cur_angle, max_angle_shift) \
                 and max(get_ver_len(center,pt),ver_len)/min(get_ver_len(center,pt),ver_len)<max_ver_ratio:
+                
             if (pt[0], pt[1]) not in POINTS:
                 nrow, ncol, nhor_angle, nver_angle, nhor_len, nver_len = update_information(center, pt, row, col, 
                                         hor_angle, ver_angle, hor_len, ver_len, dir="vertical")
-                register(pt, nrow, ncol, (row, col))
+                register(pt, nrow, ncol, (row, col), hor_angle, ver_angle)
                 search_surround(points, pt, nrow, ncol, nhor_angle, nver_angle, nhor_len, nver_len) 
     return             
             
@@ -272,6 +277,8 @@ def index_coordinate(points,
         for i, pt in enumerate(points[:8]):
             pt_angle = get_image_angle(anchor, pt)
             
+            min_ver_angle = 90.0 - max_angle_shift*start_factor
+            max_ver_angle = 90.0 + max_angle_shift*start_factor
             if abs(pt_angle) > 90.0 - max_angle_shift*start_factor:
                 ver_angle = pt_angle
                 ver_anchor = pt
@@ -357,9 +364,14 @@ if __name__ == "__main__":
     start = time.time()
     index_image(img, center, hor_anchor, ver_anchor, thresh=180, min_rad=1, max_rad=35)
     period = time.time() - start
-    print("The running time is %s.", period)
+    #print("The running time is %s.", period)
     
     display_index(img, size=0.25, color=(0,0,255), thickness=1)
+    
+    for index in POINTS:
+        if POINTS[index]["index"] == (-3,0): 
+            print(index, POINTS[index])
+            print()
     
     
     
