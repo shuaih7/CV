@@ -10,7 +10,6 @@ from matplotlib import pyplot as plt
 from skimage.measure import label, regionprops
 
 from utils import *
-from cross import get_cross
 
 
 POINTS = {}
@@ -32,7 +31,7 @@ def display_index(img, color=(0,0,255), size=0.6, thickness=2):
     return img
 
 
-def extract_points(img, thresh=220, min_rad=15, max_rad=80):
+def extract_points(img, thresh=220, min_rad=15, max_rad=80, aspect_ratio=1.8):
     """Binarize the input image and extract the points
     
     Args:
@@ -56,7 +55,9 @@ def extract_points(img, thresh=220, min_rad=15, max_rad=80):
     points = []
     for prop in properties:
         diameter = prop.equivalent_diameter
-        if diameter < min_rad or diameter > max_rad:
+        major_len = prop.major_axis_length
+        minor_len = max(1, prop.minor_axis_length)
+        if diameter < min_rad or diameter > max_rad or major_len/minor_len > aspect_ratio:
             img_points[label_mask==prop.label] = 0
         else: points.append((prop.centroid[1], prop.centroid[0]))
     
@@ -66,6 +67,13 @@ def extract_points(img, thresh=220, min_rad=15, max_rad=80):
     plt.show()
     '''
     return img_points, points
+    
+    
+def check_binary(img_bn, points):
+    for point in points:
+        if point is not None:
+            val = img_bn[point[1], point[0]]
+            if val == 0: raise ValueError("Could not find the specified anchor point.")
 
 
 def get_hor_len(point1, point2):
@@ -93,13 +101,12 @@ def register(point,
              
     point_elem = {
         "from": previous,
-        "index": (row, col)
+        "index": (row, col),
+        "hor_angle": hor_angle,
+        "ver_angle": ver_angle,
+        "hor_len": hor_len,
+        "ver_len":ver_len
     }
-        # "hor_angle": hor_angle,
-        # "ver_angle": ver_angle,
-        # "hor_len": hor_len,
-        # "ver_len":ver_len
-    # }
     
     index = (point[0], point[1])
     POINTS[index] = point_elem
@@ -184,23 +191,31 @@ def search_surround(input_points,
             
         # Calculate the angle shift
         cur_angle = get_image_angle(center, pt)
-        hor_angle_shift = abs(cur_angle - hor_angle)
-        ver_angle_shift = abs(cur_angle - ver_angle)
-            
-        if hor_angle_shift < max_angle_shift \
+        
+        ## Checking box
+        """
+        if int(x1) == 328 and int(y1) == 268: 
+            print("from:", POINTS[(center[0],center[1])]["index"])
+            print("angle =", cur_angle, "hor_angle =", hor_angle, "ver_angle =", ver_angle)
+            print()
+        """
+        
+        if is_same_dir(hor_angle, cur_angle, max_angle_shift) \
                 and max(get_hor_len(center,pt),hor_len)/min(get_hor_len(center,pt),hor_len)<max_hor_ratio:
+            
             if (pt[0], pt[1]) not in POINTS:
                 nrow, ncol, nhor_angle, nver_angle, nhor_len, nver_len = update_information(center, pt, row, col, 
                                         hor_angle, ver_angle, hor_len, ver_len, dir="horizontal")
-                register(pt, nrow, ncol, (row, col))
+                register(pt, nrow, ncol, (row, col), hor_angle, ver_angle)
                 search_surround(points, pt, nrow, ncol, nhor_angle, nver_angle, nhor_len, nver_len)
                 
-        elif ver_angle_shift < max_angle_shift \
+        elif is_same_dir(ver_angle, cur_angle, max_angle_shift) \
                 and max(get_ver_len(center,pt),ver_len)/min(get_ver_len(center,pt),ver_len)<max_ver_ratio:
+                
             if (pt[0], pt[1]) not in POINTS:
                 nrow, ncol, nhor_angle, nver_angle, nhor_len, nver_len = update_information(center, pt, row, col, 
                                         hor_angle, ver_angle, hor_len, ver_len, dir="vertical")
-                register(pt, nrow, ncol, (row, col))
+                register(pt, nrow, ncol, (row, col), hor_angle, ver_angle)
                 search_surround(points, pt, nrow, ncol, nhor_angle, nver_angle, nhor_len, nver_len) 
     return             
             
@@ -272,6 +287,8 @@ def index_coordinate(points,
         for i, pt in enumerate(points[:8]):
             pt_angle = get_image_angle(anchor, pt)
             
+            min_ver_angle = 90.0 - max_angle_shift*start_factor
+            max_ver_angle = 90.0 + max_angle_shift*start_factor
             if abs(pt_angle) > 90.0 - max_angle_shift*start_factor:
                 ver_angle = pt_angle
                 ver_anchor = pt
@@ -326,13 +343,16 @@ def index_image(img,
                 thresh=210,
                 min_rad=15,
                 max_rad=60,
+                aspect_ratio=1.8,
                 max_angle_shift=20, 
                 max_hor_ratio=1.5, 
                 max_ver_ratio=1.5,
                 start_factor=1.2):
                 
-    img_points, points = extract_points(img, thresh, min_rad, max_rad)
-    # plt.imshow(img_points, cmap="gray"), plt.show()
+    img_points, points = extract_points(img, thresh, min_rad, max_rad, aspect_ratio)
+    check_binary(img_points, [center, hor_anchor, ver_anchor])
+    #plt.imshow(img_points, cmap="gray"), plt.show()
+    #sys.exit()
     
     index_coordinate(points, center, hor_anchor, ver_anchor, max_angle_shift, 
                         max_hor_ratio, max_ver_ratio, start_factor)
@@ -347,19 +367,24 @@ def index_image(img,
 
 
 if __name__ == "__main__":
-    img_file = "./test/test1.png"
-    center = (300,216)
-    hor_anchor = (326,194)
-    ver_anchor = (283,191)
+    img_file = r"E:\Projects\Integrated_Camera\2020-12-25\2020-12-28_143741_0.png"
+    center = (166,176)
+    hor_anchor = (118,183)
+    ver_anchor = (172,143)
     
     img = cv2.imread(img_file, cv2.IMREAD_GRAYSCALE)
     
     start = time.time()
-    index_image(img, center, hor_anchor, ver_anchor, thresh=180, min_rad=1, max_rad=35)
+    
+    index_image(img, center, hor_anchor, ver_anchor, thresh=210, min_rad=3, max_rad=30, aspect_ratio=3)
     period = time.time() - start
     print("The running time is %s.", period)
     
     display_index(img, size=0.25, color=(0,0,255), thickness=1)
+    
+    #for index in POINTS:
+    #    if POINTS[index]["index"] == (-9,4):
+    #        print(POINTS[index])
     
     
     
