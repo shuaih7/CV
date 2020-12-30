@@ -10,6 +10,7 @@ from matplotlib import pyplot as plt
 from skimage.measure import label, regionprops
 
 from utils import *
+from point_extract import *
 
 
 POINTS = {}
@@ -88,6 +89,12 @@ def get_ver_len(point1, point2):
     # x2, y2 = point2
     # return math.sqrt((x2-x1)**2+(y2-y1)**2)
     return abs(point2[1]-point1[1])
+    
+    
+def get_len(point1, point2):
+    x1, y1 = point1
+    x2, y2 = point2
+    return math.sqrt((x2-x1)**2+(y2-y1)**2)
     
     
 def register(point, 
@@ -264,8 +271,8 @@ def index_coordinate(points,
         local_dist = 100000
         for i, pt in enumerate(points[:8]):
             # Find the centroid closest to the horizontal anchor point, and update the horizontal anchor
-            if get_hor_len(hor_anchor, pt) < local_dist:
-                local_dist = get_hor_len(hor_anchor, pt)
+            if get_len(hor_anchor, pt) < local_dist:
+                local_dist = get_len(hor_anchor, pt)
                 hor_index = i
     
         hor_anchor = points[hor_index]
@@ -306,8 +313,8 @@ def index_coordinate(points,
         local_dist = 100000
         for i, pt in enumerate(points[:8]):
             # Find the centroid closest to the vertical anchor point, and update the vertical anchor
-            if get_ver_len(ver_anchor, pt) < local_dist:
-                local_dist = get_ver_len(ver_anchor, pt)
+            if get_len(ver_anchor, pt) < local_dist:
+                local_dist = get_len(ver_anchor, pt)
                 ver_index = i
     
         ver_anchor = points[ver_index]
@@ -340,19 +347,17 @@ def index_image(img,
                 center, 
                 hor_anchor=None,
                 ver_anchor=None,
-                thresh=210,
-                min_rad=15,
-                max_rad=60,
-                aspect_ratio=1.8,
-                max_angle_shift=20, 
+                min_rad=3,
+                max_rad=30,
+                aspect_ratio=1.5,
+                max_angle_shift=15, 
                 max_hor_ratio=1.5, 
                 max_ver_ratio=1.5,
                 start_factor=1.2):
                 
-    img_points, points = extract_points(img, thresh, min_rad, max_rad, aspect_ratio)
+    #img_points, points = extract_points(img, thresh, min_rad, max_rad, aspect_ratio)
+    img_points, points = point_thresholding(img, min_rad, max_rad, aspect_ratio)
     check_binary(img_points, [center, hor_anchor, ver_anchor])
-    #plt.imshow(img_points, cmap="gray"), plt.show()
-    #sys.exit()
     
     index_coordinate(points, center, hor_anchor, ver_anchor, max_angle_shift, 
                         max_hor_ratio, max_ver_ratio, start_factor)
@@ -367,25 +372,26 @@ def index_image(img,
 
 
 if __name__ == "__main__":
-    img_file = r"E:\Projects\Integrated_Camera\2020-12-25\2020-12-28_143741_0.png"
-    center = (166,176)
-    hor_anchor = (118,183)
-    ver_anchor = (172,143)
+    img_file = r"E:\Projects\Integrated_Camera\point_images\2020-12-28_164902_10.png"
+    center = (310,298)
+    hor_anchor = (294,295)
+    ver_anchor = (302,277)
     
     img = cv2.imread(img_file, cv2.IMREAD_GRAYSCALE)
     
     start = time.time()
     
-    index_image(img, center, hor_anchor, ver_anchor, thresh=210, min_rad=3, max_rad=30, aspect_ratio=3)
+    index_image(img, center, hor_anchor, ver_anchor, min_rad=3, max_rad=30, aspect_ratio=1.5)
     period = time.time() - start
     print("The running time is %s.", period)
     
-    display_index(img, size=0.25, color=(0,0,255), thickness=1)
-    
-    #for index in POINTS:
-    #    if POINTS[index]["index"] == (-9,4):
-    #        print(POINTS[index])
-    
+    img_draw = display_index(img, size=0.15, color=(0,0,255), thickness=1)
+    cv2.imwrite("result.png", img_draw)
+    """
+    for index in POINTS:
+        if POINTS[index]["index"] == (1,0):
+            print(index, POINTS[index])
+    """
     
     
 
