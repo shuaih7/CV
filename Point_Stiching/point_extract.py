@@ -119,14 +119,15 @@ def point_thresholding(image, min_d=3, max_d=30, aspect_ratio=1.5):
     
     
 if __name__ == "__main__":
+    """
     img_file = r"E:\Projects\Integrated_Camera\point_images\2020-12-28_164902_10.png"
     image = cv2.imread(img_file, cv2.IMREAD_GRAYSCALE)
     img_pt, points = point_thresholding(image)
     
     """
-    img_dir = r"E:\Projects\Integrated_Camera\point_images"
+    img_dir = r"E:\Projects\Integrated_Camera\point_images_2"
     
     img_list = gb.glob(img_dir + r"/*.png")
     for img_file in img_list:
-        img_pt = point_thresholding(img_file)
-    """
+        image = cv2.imread(img_file, cv2.IMREAD_GRAYSCALE)
+        img_pt = point_thresholding(image)

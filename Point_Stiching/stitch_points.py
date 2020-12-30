@@ -351,8 +351,8 @@ def index_image(img,
                 max_rad=30,
                 aspect_ratio=1.5,
                 max_angle_shift=15, 
-                max_hor_ratio=1.5, 
-                max_ver_ratio=1.5,
+                max_hor_ratio=1.25, 
+                max_ver_ratio=1.25,
                 start_factor=1.2):
                 
     #img_points, points = extract_points(img, thresh, min_rad, max_rad, aspect_ratio)
@@ -372,21 +372,37 @@ def index_image(img,
 
 
 if __name__ == "__main__":
-    img_file = r"E:\Projects\Integrated_Camera\point_images\2020-12-28_164902_10.png"
-    center = (310,298)
-    hor_anchor = (294,295)
-    ver_anchor = (302,277)
+    img_file = r"E:\Projects\Integrated_Camera\point_images_2\2020-12-08_180654_0.png"
     
+    center = (208,289)
+    hor_anchor = (238,259)
+    ver_anchor = (191,259)
+    """
+    center = (56, 250)
+    hor_anchor = (81, 228)
+    ver_anchor = (39, 224)
+    
+    center = (259, 309)
+    hor_anchor = (282, 298)
+    ver_anchor = (256, 291)
+    
+    center = (77, 308)
+    hor_anchor = (96, 296)
+    ver_anchor = (72, 291)
+    """
     img = cv2.imread(img_file, cv2.IMREAD_GRAYSCALE)
     
     start = time.time()
     
     index_image(img, center, hor_anchor, ver_anchor, min_rad=3, max_rad=30, aspect_ratio=1.5)
     period = time.time() - start
-    print("The running time is %s.", period)
+    # print("The running time is %s.", period)
     
-    img_draw = display_index(img, size=0.15, color=(0,0,255), thickness=1)
-    cv2.imwrite("result.png", img_draw)
+    _, filename = os.path.split(img_file)
+    fname, _ = os.path.splitext(filename)
+    save_name = fname + "_result.png"
+    img_draw = display_index(img, size=0.25, color=(255,0,0), thickness=1)
+    cv2.imwrite(save_name, img_draw)
     """
     for index in POINTS:
         if POINTS[index]["index"] == (1,0):
