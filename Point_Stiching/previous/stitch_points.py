@@ -10,7 +10,7 @@ from matplotlib import pyplot as plt
 from skimage.measure import label, regionprops
 
 from utils import *
-from feature_extract import *
+from point_extract import *
 
 
 POINTS = {}
@@ -30,6 +30,51 @@ def display_index(img, color=(0,0,255), size=0.6, thickness=2):
     plt.show()
     
     return img
+
+
+def extract_points(img, thresh=220, min_rad=15, max_rad=80, aspect_ratio=1.8):
+    """Binarize the input image and extract the points
+    
+    Args:
+        img: Input grayscale image
+        thresh: Thesholding value for the image binarization
+        min_rad: Minimum point radius
+        max_rad: Maximum point radius
+        
+    Returns:
+        img_points: Binarized image contains the points
+        points: List of centroid points
+        
+    """
+    img = cv2.GaussianBlur(img,(5,5),0)
+    thres,img_points = cv2.threshold(img,thresh,255,cv2.THRESH_BINARY)
+
+    # Create the region proposal mask and filter out the curve
+    label_mask = label(img_points, connectivity = 2)
+    properties = regionprops(label_mask)
+
+    points = []
+    for prop in properties:
+        diameter = prop.equivalent_diameter
+        major_len = prop.major_axis_length
+        minor_len = max(1, prop.minor_axis_length)
+        if diameter < min_rad or diameter > max_rad or major_len/minor_len > aspect_ratio:
+            img_points[label_mask==prop.label] = 0
+        else: points.append((prop.centroid[1], prop.centroid[0]))
+    
+    '''
+    plt.subplot(1,2,1), plt.imshow(img_points, cmap="gray"), plt.title("Point Image")
+    plt.subplot(1,2,2), plt.imshow(img_cross, cmap="gray"), plt.title("Cross Image")
+    plt.show()
+    '''
+    return img_points, points
+    
+    
+def check_binary(img_bn, points):
+    for point in points:
+        if point is not None:
+            val = img_bn[point[1], point[0]]
+            if val == 0: raise ValueError("Could not find the specified anchor point.")
 
 
 def get_hor_len(point1, point2):
@@ -184,8 +229,8 @@ def search_surround(input_points,
 
 def index_coordinate(points, 
                      center, 
-                     hor_angle,
-                     ver_angle,
+                     hor_anchor=None,
+                     ver_anchor=None,
                      max_angle_shift=10, 
                      max_hor_ratio=1.5, 
                      max_ver_ratio=1.5,
@@ -193,61 +238,128 @@ def index_coordinate(points,
     
     # 1. Get the closest point as the anchor
     points = sort_points(center, points)
-    if len(points) < 4: 
-        raise PointsNotEnoughError("There are not enough points for the alogorithm to define the locality.")
+    if len(points) == 0: return # Case when there is no point inside this coordinate
     
     anchor = points[0]
-    if anchor[0] < center[0]: col = 0
-    else: col = 1
-    if anchor[1] < center[1]: row = 1
-    else: row = 0
-    register(anchor, row=row, col=col)
+    register(anchor, row=0, col=0)
     
     # 2. Register the horizontal and vertical anchors
+    if len(points) == 1: return # Case when there is only one point inside this coordinate
     points = points[1:]
-    hor_len, ver_len = None, None
-    is_hor_registered = False
-    is_ver_registered = False
     
-    for pt in points[:3]:
-        cur_angle = get_image_angle(anchor, pt)
+    if hor_anchor is None:
+        print("Warning: The horizontal anchor point has not been set, this may cause fatal stiching error to the final result!")
         
-        if is_same_dir(hor_angle, cur_angle, max_angle_shift):
-            if not is_hor_registered:
-                hor_len = get_hor_len(anchor, pt)
-                is_hor_registered = True
+        hor_index = -1
+        for i, pt in enumerate(points[:8]):
+            pt_angle = get_image_angle(anchor, pt)
             
-        elif is_same_dir(ver_angle, cur_angle, max_angle_shift):
-            if not is_ver_registered:
-                ver_len = get_ver_len(anchor, pt)
-                is_ver_registered = True
+            if abs(pt_angle) < max_angle_shift*start_factor:
+                hor_angle = pt_angle
+                hor_anchor = pt
+                hor_len = get_hor_len(anchor, hor_anchor)
+                hor_index = i
+                break
+                
+        if hor_index >= 0: 
+            del points[hor_index]
+        else:
+            raise Exception("Could not find the horizontal anchor automatically.")
+        
+    else:
+        hor_index = 0
+        local_dist = 100000
+        for i, pt in enumerate(points[:8]):
+            # Find the centroid closest to the horizontal anchor point, and update the horizontal anchor
+            if get_len(hor_anchor, pt) < local_dist:
+                local_dist = get_len(hor_anchor, pt)
+                hor_index = i
     
-    # 3. Start indexing the image
-    if hor_len is None or ver_len is None:
-        raise AnchorNotFoundError("Could not find the anchors for locality.")
-    search_surround(points, anchor, row, col, hor_angle, ver_angle, hor_len, ver_len, 
+        hor_anchor = points[hor_index]
+        hor_angle = get_image_angle(anchor, hor_anchor)
+        hor_len = get_hor_len(anchor, hor_anchor)
+        del points[hor_index]
+    
+    # Register the horizontal anchor
+    if hor_anchor[0] > anchor[0]:
+        hor_anchor_col = 1
+    else:
+        hor_anchor_col = -1
+    register(hor_anchor, row=0, col=hor_anchor_col, previous=(0,0))
+        
+    if ver_anchor is None:
+        print("Warning: The vertical anchor point has not been set, this may cause fatal stiching error to the final result!")
+    
+        ver_index = -1
+        for i, pt in enumerate(points[:8]):
+            pt_angle = get_image_angle(anchor, pt)
+            
+            min_ver_angle = 90.0 - max_angle_shift*start_factor
+            max_ver_angle = 90.0 + max_angle_shift*start_factor
+            if abs(pt_angle) > 90.0 - max_angle_shift*start_factor:
+                ver_angle = pt_angle
+                ver_anchor = pt
+                ver_len = get_ver_len(anchor, ver_anchor)
+                ver_index = i
+                break
+                
+        if ver_index >= 0: 
+            del points[ver_index]
+        else: 
+            raise Exception("Could not find the vertical anchor automatically.")
+            
+    else:
+        ver_index = 0
+        local_dist = 100000
+        for i, pt in enumerate(points[:8]):
+            # Find the centroid closest to the vertical anchor point, and update the vertical anchor
+            if get_len(ver_anchor, pt) < local_dist:
+                local_dist = get_len(ver_anchor, pt)
+                ver_index = i
+    
+        ver_anchor = points[ver_index]
+        ver_angle = get_image_angle(anchor, ver_anchor)
+        ver_len = get_ver_len(anchor, ver_anchor)
+        del points[ver_index]
+        
+    # Register the vertical anchor
+    if ver_anchor[1] > anchor[1]:
+        ver_anchor_row = -1
+    else:
+        ver_anchor_row = 1
+    register(ver_anchor, row=ver_anchor_row, col=0, previous=(0,0))
+    
+    if hor_anchor is None and ver_anchor is None: return # Case when the horizontal and vertical anchors cannot be found
+        
+    pts_for_hor = points
+    pts_for_ver = points.copy()
+    
+    search_surround(points, hor_anchor, 0, hor_anchor_col, hor_angle, ver_angle, hor_len, ver_len, 
+                    max_angle_shift, max_hor_ratio, max_ver_ratio)
+    search_surround(points, ver_anchor, ver_anchor_row, 0, hor_angle, ver_angle, hor_len, ver_len, 
                     max_angle_shift, max_hor_ratio, max_ver_ratio)
         
     # print(anchor, hor_anchor, ver_anchor)
     # plt.imshow(cur_points, cmap="gray"), plt.show()
     
 
-def index_image(image, 
-                pt_thresh=30,
-                pt_min_d=20,
-                pt_max_d=65,
-                pt_aspect_ratio=1.5,
-                cr_thresh=30,
+def index_image(img, 
+                center, 
+                hor_anchor=None,
+                ver_anchor=None,
+                min_rad=3,
+                max_rad=30,
+                aspect_ratio=1.5,
                 max_angle_shift=15, 
                 max_hor_ratio=1.25, 
                 max_ver_ratio=1.25,
                 start_factor=1.2):
                 
     #img_points, points = extract_points(img, thresh, min_rad, max_rad, aspect_ratio)
-    points, center, hor_angle, ver_angle = extract_feature(image, 
-        pt_thresh, pt_min_d, pt_max_d, pt_aspect_ratio, cr_thresh)
+    img_points, points = point_thresholding(img, min_rad, max_rad, aspect_ratio)
+    check_binary(img_points, [center, hor_anchor, ver_anchor])
     
-    index_coordinate(points, center, hor_angle, ver_angle, max_angle_shift, 
+    index_coordinate(points, center, hor_anchor, ver_anchor, max_angle_shift, 
                         max_hor_ratio, max_ver_ratio, start_factor)
     
     # plt.subplot(1,2,1), plt.imshow(img_points, cmap="gray"), plt.title("Point Image")
@@ -260,27 +372,42 @@ def index_image(image,
 
 
 if __name__ == "__main__":
-    img_dir = r"E:\Projects\Integrated_Camera\bsi_proj\diff"
-    img_list = gb.glob(img_dir + r"/*.png")
+    img_file = r"E:\Projects\Integrated_Camera\point_images_2\2020-12-08_180654_0.png"
     
-    for img_file in img_list:
-        print("Processing", img_file)
-        img = cv2.imread(img_file, cv2.IMREAD_COLOR)
-        
-        start = time.time()
-        try:
-            index_image(img)
-        except: pass
-        #period = time.time() - start
-        #print("The running time is %s.", period)
-        
-        img_draw = display_index(img, size=0.25, color=(0,0,255), thickness=1)
-        POINTS = {}
-        """
-        for index in POINTS:
-            if POINTS[index]["index"] == (1,0):
-                print(index, POINTS[index])
-        """
+    center = (208,289)
+    hor_anchor = (238,259)
+    ver_anchor = (191,259)
+    """
+    center = (56, 250)
+    hor_anchor = (81, 228)
+    ver_anchor = (39, 224)
+    
+    center = (259, 309)
+    hor_anchor = (282, 298)
+    ver_anchor = (256, 291)
+    
+    center = (77, 308)
+    hor_anchor = (96, 296)
+    ver_anchor = (72, 291)
+    """
+    img = cv2.imread(img_file, cv2.IMREAD_GRAYSCALE)
+    
+    start = time.time()
+    
+    index_image(img, center, hor_anchor, ver_anchor, min_rad=3, max_rad=30, aspect_ratio=1.5)
+    period = time.time() - start
+    # print("The running time is %s.", period)
+    
+    _, filename = os.path.split(img_file)
+    fname, _ = os.path.splitext(filename)
+    save_name = fname + "_result.png"
+    img_draw = display_index(img, size=0.25, color=(255,0,0), thickness=1)
+    cv2.imwrite(save_name, img_draw)
+    """
+    for index in POINTS:
+        if POINTS[index]["index"] == (1,0):
+            print(index, POINTS[index])
+    """
     
     
 
