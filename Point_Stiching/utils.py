@@ -77,14 +77,27 @@ def create_background(shape, save_name="background.png"):
     cv2.imwrite(save_name, img)
     
     
+def image_diff(img_file1, img_file2, save_dir=None, save_name=None, suffix=None):
+    image1 = cv2.imread(img_file1, cv2.IMREAD_COLOR).astype(np.float32)
+    image2 = cv2.imread(img_file2, cv2.IMREAD_COLOR).astype(np.float32)
+    image_diff = image1 - image2
+    image_diff[image_diff < 0] = 0
+    image_diff = image_diff.astype(np.uint8)
+    
+    dir, filename = os.path.split(img_file1)
+    fname, suf = os.path.splitext(filename)
+    
+    if save_dir is None: save_dir = dir
+    if save_name is None: save_name = "diff_"+fname
+    if suffix is None: suffix = suf
+    
+    cv2.imwrite(os.path.join(save_dir, save_name+suffix), image_diff)
+    print("Done")
+    
+    
 if __name__ == "__main__":
-    hor_angle = 130.048
-    ver_angle = 242.009
-    cur_angle = 238.47
+    image_file1 = r"E:\Projects\Integrated_Camera\bsi_proj\1\1_14.png"
+    image_file2 = r"E:\Projects\Integrated_Camera\bsi_proj\1\1_15.png"
     
-    max_angle_shift = 10
-    
-    if is_same_dir(hor_angle, cur_angle, max_angle_shift): 
-        print("Yes")
-    else: print("No")
+    image_diff(image_file1, image_file2)
     
